@@ -155,7 +155,6 @@ def get_all_feedbacks(
     admin_key: str = Header(...)
 ):
 
-    # Admin validation
     if admin_user not in config.ADMIN_ACCESS_USERS:
         raise HTTPException(status_code=403, detail="User not allowed")
 
@@ -169,15 +168,18 @@ def get_all_feedbacks(
         response = (
             config.supabase
             .table(config.SUPABASE_TABLE)
-            .select("*")
+            .select("*", count="exact")
             .range(start, end)
             .execute()
         )
 
+        total = response.count
+
         return {
             "page": page,
             "limit": limit,
-            "count": len(response.data),
+            "total": total,
+            "total_pages": (total + limit - 1) // limit,
             "data": response.data
         }
 

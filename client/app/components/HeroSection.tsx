@@ -1,6 +1,10 @@
+"use client"
+
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 
 export default function HeroSection() {
+    const router = useRouter()
     return (
         <div className="w-full">
 
@@ -20,7 +24,7 @@ export default function HeroSection() {
 
                         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-2 justify-center md:justify-start">
 
-                            <Button className="px-12 cursor-pointer py-7 bg-[#2d7b53] text-xl font-medium shadow-sm hover:shadow-md transition">
+                            <Button onClick={() => router.push("/dashboard")} className="px-12 cursor-pointer py-7 bg-[#2d7b53] text-xl font-medium shadow-sm hover:shadow-md transition">
                                 Get Started
                             </Button>
 
