@@ -4,9 +4,10 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Check, Menu, X } from "lucide-react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 
 export default function Header() {
+  const router = useRouter()
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
 
@@ -79,7 +80,7 @@ export default function Header() {
 
           {/* Admin Button Desktop */}
           <div className="hidden md:block">
-            <Button className="text-lg cursor-pointer text-black border border-[#e7d8d8] bg-white hover:scale-[1.02] transition">
+            <Button onClick={() => router.push("/admin")} className="text-lg cursor-pointer text-black border border-[#e7d8d8] bg-white hover:scale-[1.02] transition">
               Admin Panel
             </Button>
           </div>
@@ -154,7 +155,7 @@ export default function Header() {
           </div>
 
           {/* Admin Button */}
-          <Button className="mt-4 text-xl text-black border border-[#e7d8d8] bg-white hover:scale-[1.02] transition">
+          <Button onClick={() => router.push("/admin")} className="mt-4 text-xl text-black border border-[#e7d8d8] bg-white hover:scale-[1.02] transition">
             Admin Panel
           </Button>
 
