@@ -1,3 +1,6 @@
+import sys
+sys.modules['pyaudio'] = None
+
 from fastapi import FastAPI, Query, UploadFile, File, Request, HTTPException, Header, Form
 from fastapi.middleware.cors import CORSMiddleware
 import os
