@@ -25,6 +25,8 @@ app.add_middleware(
 )
 
 MODEL_PATH = "model/hospital-project-linux-x86_64-v17.eim"
+os.chmod(MODEL_PATH, 0o755)
+
 TEMP_DIR = "temp"
 
 os.makedirs(TEMP_DIR, exist_ok=True)
@@ -38,6 +40,8 @@ MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 @app.on_event("startup")
 def load_model():
     global runner, model_info
+    os.chmod(MODEL_PATH, 0o755)
+    
     runner = ImageImpulseRunner(MODEL_PATH)
     model_info = runner.init()
 
