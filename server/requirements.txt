@@ -86,3 +86,4 @@ yarl==1.23.0
 zstandard==0.25.0
 
 gunicorn==20.1.0
+setuptools==75.6.0
