@@ -37,7 +37,7 @@ model_info = None
 
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
-rembg_session = new_session()
+rembg_session = new_session(model_path="model/u2netp.onnx")
 
 # Load Edge Impulse model
 @app.on_event("startup")
