@@ -2,36 +2,60 @@
 
 import { useEffect, useRef, useState } from "react";
 import { detectMobile, startCamera, captureImage } from "@/lib/camera";
-import { checkServerHealth, predictImage, sendFeedback } from "@/lib/api";
+import { predictImage, sendFeedback } from "@/lib/api";
+import { Loader2 } from "lucide-react";
+import type { PredictResponse } from "@/types/prediction"
 
 export default function Dashboard() {
 
-  const videoRef = useRef<any>(null);
-  const canvasRef = useRef<any>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const [cameraOpen, setCameraOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false);
+
   const [image, setImage] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null)
 
   const [loading, setLoading] = useState(false)
+  const [feedbackLoading, setFeedbackLoading] = useState(false)
 
-  const [prediction, setPrediction] = useState<any>(null)
+  const [prediction, setPrediction] = useState<PredictResponse | null>(null)
 
   const [showFeedback, setShowFeedback] = useState(false)
   const [correctLabel, setCorrectLabel] = useState("")
+
+  const [thankYouMessage, setThankYouMessage] = useState("")
+  const [responseFinalized, setResponseFinalized] = useState(false)
 
   useEffect(() => {
     setIsMobile(detectMobile());
   }, []);
 
+  const showThankYou = () => {
+    setThankYouMessage("Thank you for your response!")
+    setTimeout(() => {
+      setThankYouMessage("")
+    }, 3000)
+  }
+
+  const resetStates = () => {
+    setPrediction(null)
+    setShowFeedback(false)
+    setCorrectLabel("")
+    setResponseFinalized(false)
+  }
+
   const openLaptopCamera = async () => {
+    resetStates()
     await startCamera(videoRef);
     setCameraOpen(true);
   };
 
   const takePhoto = async () => {
     if (!cameraOpen) return;
+
+    resetStates()
 
     const img = captureImage(videoRef, canvasRef);
     setImage(img);
@@ -44,12 +68,12 @@ export default function Dashboard() {
 
   const handleMobileCapture = (event:any) => {
 
+    resetStates()
+
     const file = event.target.files[0];
 
     if (file) {
-
       setFile(file)
-
       const url = URL.createObjectURL(file)
       setImage(url)
     }
@@ -73,7 +97,7 @@ export default function Dashboard() {
 
     console.error("Prediction failed:", error)
 
-    alert("Prediction failed. Check console.")
+    alert("Prediction failed.")
 
   }
 
@@ -82,6 +106,8 @@ export default function Dashboard() {
 
   const handleYes = () => {
     setShowFeedback(false)
+    setResponseFinalized(true)
+    showThankYou()
   }
 
   const handleNo = () => {
@@ -91,28 +117,54 @@ export default function Dashboard() {
   const submitFeedback = async () => {
 
   if (!file || !prediction) return
+  setFeedbackLoading(true)
 
   try {
 
-    const res = await sendFeedback(
+    await sendFeedback(
       file,
       prediction.top_prediction.label,
       correctLabel
     )
 
-    console.log("Feedback response:", res)
-
-    alert("Feedback saved!")
+    setResponseFinalized(true)
+    showThankYou()
 
   } catch (error) {
 
     console.error("Feedback failed:", error)
-
     alert("Feedback failed")
 
   }
 
+  setFeedbackLoading(false)
   setShowFeedback(false)
+}
+
+const chooseSuggestedLabel = async (label:string) => {
+
+  if (!file || !prediction) return
+  setFeedbackLoading(true)
+
+  try {
+
+    await sendFeedback(
+      file,
+      prediction.top_prediction.label,
+      label
+    )
+
+    setResponseFinalized(true)
+    showThankYou()
+
+  } catch (err) {
+
+    console.error(err)
+    alert("Feedback failed")
+
+  }
+
+  setFeedbackLoading(false)
 }
 
   return (
@@ -124,7 +176,6 @@ export default function Dashboard() {
 
       <div className="bg-white shadow-xl rounded-xl p-6 w-full max-w-md flex flex-col items-center">
 
-        {/* MOBILE CAMERA */}
         {isMobile && (
           <label className="bg-blue-600 text-white px-6 py-3 rounded-lg cursor-pointer mb-4 hover:bg-blue-700 transition">
             Open Camera
@@ -138,7 +189,6 @@ export default function Dashboard() {
           </label>
         )}
 
-        {/* LAPTOP CAMERA */}
         {!isMobile && (
           <>
             <button
@@ -166,7 +216,6 @@ export default function Dashboard() {
           </>
         )}
 
-        {/* IMAGE PREVIEW */}
         {image && (
           <div className="mt-6 flex flex-col items-center">
 
@@ -177,51 +226,92 @@ export default function Dashboard() {
               className="rounded-lg border w-72"
             />
 
-            {/* PREDICT BUTTON */}
             {!prediction && (
               <button
                 onClick={handlePredict}
-                className="mt-4 bg-purple-600 text-white px-6 py-2 rounded-lg"
+                disabled={loading}
+                className="mt-4 bg-purple-600 text-white px-6 py-2 rounded-lg flex items-center gap-2"
               >
+                {loading && <Loader2 className="animate-spin w-4 h-4" />}
                 {loading ? "Predicting..." : "Predict"}
               </button>
             )}
 
-            {/* RESULT */}
             {prediction && (
               <div className="mt-4 text-center">
 
-                <p className="text-lg font-semibold">
-                  Prediction: {prediction.top_prediction.label}
-                </p>
+                {"message" in prediction && !responseFinalized && (
+                  <>
+                    <p className="text-yellow-600 font-semibold">
+                      {prediction.message}
+                    </p>
 
-                <p className="text-sm text-gray-500">
-                  Confidence: {(prediction.top_prediction.confidence * 100).toFixed(2)}%
-                </p>
+                    <div className="flex gap-4 mt-4">
 
-                <div className="flex gap-4 mt-4">
+                      <button
+                        disabled={feedbackLoading}
+                        onClick={() => chooseSuggestedLabel(prediction.top_prediction.label)}
+                        className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2"
+                      >
+                        {feedbackLoading && <Loader2 className="animate-spin w-4 h-4" />}
+                        {prediction.top_prediction.label}
+                      </button>
 
-                  <button
-                    onClick={handleYes}
-                    className="bg-green-600 text-white px-4 py-2 rounded"
-                  >
-                    Yes
-                  </button>
+                      <button
+                        disabled={feedbackLoading}
+                        onClick={() => chooseSuggestedLabel(prediction.second_prediction.label)}
+                        className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2"
+                      >
+                        {feedbackLoading && <Loader2 className="animate-spin w-4 h-4" />}
+                        {prediction.second_prediction.label}
+                      </button>
 
-                  <button
-                    onClick={handleNo}
-                    className="bg-red-600 text-white px-4 py-2 rounded"
-                  >
-                    No
-                  </button>
+                    </div>
+                  </>
+                )}
 
-                </div>
+                {!("message" in prediction) && (
+                  <>
+                    <p className="text-lg font-semibold">
+                      Prediction: {prediction.top_prediction.label}
+                    </p>
+
+                    <p className="text-sm text-gray-500">
+                      Confidence: {(prediction.top_prediction.confidence * 100).toFixed(2)}%
+                    </p>
+                  </>
+                )}
+
+                {!responseFinalized && (
+                  <div className="flex gap-4 mt-4">
+
+                    <button
+                      onClick={handleYes}
+                      className="bg-green-600 text-white px-4 py-2 rounded"
+                    >
+                      Yes
+                    </button>
+
+                    <button
+                      onClick={handleNo}
+                      className="bg-red-600 text-white px-4 py-2 rounded"
+                    >
+                      No
+                    </button>
+
+                  </div>
+                )}
+
+                {thankYouMessage && (
+                  <div className="mt-3 text-green-600 font-medium">
+                    {thankYouMessage}
+                  </div>
+                )}
 
               </div>
             )}
 
-            {/* FEEDBACK */}
-            {showFeedback && (
+            {showFeedback && !responseFinalized && (
               <div className="mt-4 flex flex-col gap-2">
 
                 <select
@@ -237,9 +327,11 @@ export default function Dashboard() {
                 </select>
 
                 <button
+                  disabled={feedbackLoading}
                   onClick={submitFeedback}
-                  className="bg-blue-600 text-white px-4 py-2 rounded"
+                  className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 justify-center"
                 >
+                  {feedbackLoading && <Loader2 className="animate-spin w-4 h-4" />}
                   Submit Feedback
                 </button>
 

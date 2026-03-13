@@ -1,3 +1,4 @@
+import { PredictResponse } from "@/types/prediction"
 import axios from "axios"
 
 const SERVER_URL = process.env.NEXT_PUBLIC_BACKEND_API!
@@ -12,7 +13,7 @@ export const checkServerHealth = async () => {
   }
 }
 
-export const predictImage = async (file: File) => {
+export const predictImage = async (file: File):  Promise<PredictResponse> => {
   try {
     const formData = new FormData()
     formData.append("file", file)

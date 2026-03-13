@@ -12,6 +12,7 @@ import config
 from datetime import datetime
 import uuid
 import cloudinary.uploader
+from rembg import remove, new_session
 
 app = FastAPI()
 
@@ -35,6 +36,8 @@ runner = None
 model_info = None
 
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+
+rembg_session = new_session()
 
 # Load Edge Impulse model
 @app.on_event("startup")
@@ -73,36 +76,94 @@ async def predict_image(file: UploadFile = File(...)):
     if img is None:
         return {"error": "Invalid image"}
 
-    # OpenCV loads BGR → convert to RGB
+    # BGR → RGB
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-    # Extract features using the SAME pipeline as Edge Impulse Studio !!!!!!!!IMPORTANT!!!!!!!!
-    features, cropped = runner.get_features_from_image_auto_studio_settings(img)
-    # !!!!!!!!IMPORTANT!!!!!!!!
+    # -------- BACKGROUND REMOVAL --------
+    bg_removed = remove(img, session=rembg_session)
+
+    if bg_removed.shape[2] == 4:
+        alpha = bg_removed[:, :, 3]
+        rgb = bg_removed[:, :, :3]
+
+        mask = alpha > 0
+        result_img = np.zeros_like(rgb)
+        result_img[mask] = rgb[mask]
+    else:
+        result_img = bg_removed
+    # ------------------------------------
+
+    # Debug image
+    #cv2.imwrite("debug_bg_removed.jpg", cv2.cvtColor(result_img, cv2.COLOR_RGB2BGR))
+
+    # Extract features using Edge Impulse pipeline
+    features, cropped = runner.get_features_from_image_auto_studio_settings(result_img)
 
     # Run inference
     result = runner.classify(features)
-
-    # Save debug image (what the model actually sees)
-    # cv2.imwrite("debug.jpg", cv2.cvtColor(cropped, cv2.COLOR_RGB2BGR))
 
     classification = result["result"]["classification"]
 
     highest_label = max(classification, key=classification.get)
     highest_value = classification[highest_label]
 
+    # ---------- PAPER vs PLASTIC FIX ----------
+    paper_score = classification.get("paper", 0)
+    plastic_score = classification.get("plastic", 0)
+
+    if abs(paper_score - plastic_score) < 0.2:
+
+        gray = cv2.cvtColor(result_img, cv2.COLOR_RGB2GRAY)
+
+        bright_pixels = np.sum(gray > 220) / gray.size
+
+        laplacian = cv2.Laplacian(gray, cv2.CV_64F)
+        texture_score = np.var(laplacian)
+
+        if highest_label == "paper" and bright_pixels > 0.05:
+            highest_label = "plastic"
+
+        elif highest_label == "plastic" and texture_score > 120:
+            highest_label = "paper"
+    # -----------------------------------------
+
+    # Sort predictions
+    sorted_predictions = sorted(
+        classification.items(),
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+    top1_label, top1_conf = sorted_predictions[0]
+    top2_label, top2_conf = sorted_predictions[1]
+
+    # ---------- UNCERTAIN CASE ----------
+    if top1_conf < 0.7 or (top1_conf - top2_conf) < 0.15:
+        return {
+            "message": f"Model uncertain. It may be either {top1_label} or {top2_label}.",
+            "top_prediction": {
+                "label": top1_label,
+                "confidence": top1_conf
+            },
+            "second_prediction": {
+                "label": top2_label,
+                "confidence": top2_conf
+            }
+        }
+
+    # ---------- NORMAL CASE ----------
     above_threshold = {
         label: value
         for label, value in classification.items()
-        if value > 0.5 and value != highest_value
+        if value > 0.7 and label != top1_label
     }
 
     return {
         "top_prediction": {
-            "label": highest_label,
-            "confidence": highest_value
+            "label": top1_label,
+            "confidence": top1_conf
         },
-        "others_above_0.5": above_threshold
+        "others_above_0.7": above_threshold
     }
     
 # ---------------------------
