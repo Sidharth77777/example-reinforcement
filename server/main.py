@@ -1,4 +1,5 @@
 import sys
+import threading
 import types
 sys.modules["pyaudio"] = types.ModuleType("pyaudio")
 
@@ -26,7 +27,7 @@ app.add_middleware(
 )
 
 MODEL_PATH = "model/hospital-project-linux-x86_64-v21.eim"
-os.chmod(MODEL_PATH, 0o755)
+# os.chmod(MODEL_PATH, 0o755)
 
 TEMP_DIR = "temp"
 
@@ -37,21 +38,20 @@ model_info = None
 
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
-rembg_session = new_session(model_path="model/u2netp.onnx")
+rembg_session = None
 
 # Load Edge Impulse model
 @app.on_event("startup")
 def load_model():
-    global runner, model_info
-    os.chmod(MODEL_PATH, 0o755)
-    
-    runner = ImageImpulseRunner(MODEL_PATH)
-    model_info = runner.init()
+    def _load():
+        global runner, model_info, rembg_session
+        rembg_session = new_session(model_path="model/u2netp.onnx")
+        os.chmod(MODEL_PATH, 0o755)
+        runner = ImageImpulseRunner(MODEL_PATH)
+        model_info = runner.init()
+        print("✅ Model loaded successfully")
 
-    print("Model loaded successfully")
-    print("MODEL INFO:")
-    print(model_info)
-
+    threading.Thread(target=_load, daemon=True).start()
 
 @app.get("/")
 def home():
@@ -63,6 +63,8 @@ def home():
 # ---------------------------
 @app.post("/predict")
 async def predict_image(file: UploadFile = File(...)):
+    if runner is None or rembg_session is None:
+        raise HTTPException(status_code=503, detail="Model still loading, please retry in a moment")
 
     contents = await file.read()
 
@@ -233,7 +235,7 @@ async def save_feedback(
     corrected_label: str = Form(...)
 ):
 
-    allowed_labels = ["biomedical", "food", "paper", "plastic"]
+    allowed_labels = ["biomedical", "food", "paper", "plastic", "mixed waste"]
 
     if corrected_label not in allowed_labels:
         return {"error": "Invalid corrected label"}
