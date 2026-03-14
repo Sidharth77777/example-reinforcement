@@ -13,22 +13,15 @@ export const checkServerHealth = async () => {
   }
 }
 
-export const predictImage = async (file: File):  Promise<PredictResponse> => {
-  try {
-    const formData = new FormData()
-    formData.append("file", file)
-
-    const res = await axios.post(`${SERVER_URL}/predict`, formData, {
-      headers: {
-        "Content-Type": "multipart/form-data"
-      }
-    })
-
-    return res.data
-  } catch (error) {
-    console.error("Image prediction failed:", error)
-    throw error
-  }
+export const predictImage = async (file: File): Promise<PredictResponse> => {
+  const formData = new FormData()
+  formData.append("file", file)
+ 
+  const res = await axios.post(`${SERVER_URL}/predict`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  })
+ 
+  return res.data
 }
 
 export const sendFeedback = async (

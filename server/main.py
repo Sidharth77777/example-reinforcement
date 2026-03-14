@@ -25,7 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MODEL_PATH = "model/hospital-project-linux-x86_64-v17.eim"
+MODEL_PATH = "model/hospital-project-linux-x86_64-v21.eim"
 os.chmod(MODEL_PATH, 0o755)
 
 TEMP_DIR = "temp"
@@ -66,15 +66,14 @@ async def predict_image(file: UploadFile = File(...)):
 
     contents = await file.read()
 
-    if len(contents) > MAX_FILE_SIZE:
-        return {"error": "Image too large"}
+    # if len(contents) > MAX_FILE_SIZE:
+    #     return {"error": "File too large. Maximum size is 5MB."}
 
     np_arr = np.frombuffer(contents, np.uint8)
-
     img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
     if img is None:
-        return {"error": "Invalid image"}
+        return {"error": "Invalid or unreadable image"}
 
     # BGR → RGB
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -84,50 +83,96 @@ async def predict_image(file: UploadFile = File(...)):
 
     if bg_removed.shape[2] == 4:
         alpha = bg_removed[:, :, 3]
-        rgb = bg_removed[:, :, :3]
-
-        mask = alpha > 0
+        rgb   = bg_removed[:, :, :3]
+        mask  = alpha > 0
         result_img = np.zeros_like(rgb)
         result_img[mask] = rgb[mask]
     else:
         result_img = bg_removed
     # ------------------------------------
 
-    # Debug image
-    #cv2.imwrite("debug_bg_removed.jpg", cv2.cvtColor(result_img, cv2.COLOR_RGB2BGR))
+    # -------- EARLY EXIT: blank image after bg removal --------
+    if result_img.max() == 0:
+        return {"error": "No foreground object detected after background removal"}
+    # ----------------------------------------------------------
 
-    # Extract features using Edge Impulse pipeline
-    features, cropped = runner.get_features_from_image_auto_studio_settings(result_img)
-
-    # Run inference
+    # Extract features and run inference
+    features, _ = runner.get_features_from_image_auto_studio_settings(result_img)
     result = runner.classify(features)
+    classification: dict = result["result"]["classification"]
 
-    classification = result["result"]["classification"]
+    # ==========================================
+    # PAPER vs PLASTIC HEURISTIC CORRECTION
+    # ==========================================
+    paper_score   = classification.get("paper",   0.0)
+    plastic_score = classification.get("plastic",  0.0)
 
-    highest_label = max(classification, key=classification.get)
-    highest_value = classification[highest_label]
-
-    # ---------- PAPER vs PLASTIC FIX ----------
-    paper_score = classification.get("paper", 0)
-    plastic_score = classification.get("plastic", 0)
-
+    # Only apply when the model is genuinely confused
     if abs(paper_score - plastic_score) < 0.2:
 
         gray = cv2.cvtColor(result_img, cv2.COLOR_RGB2GRAY)
+        total_pixels = gray.size
 
-        bright_pixels = np.sum(gray > 220) / gray.size
+        # --- Signal extraction ---
+        bright_pixels  = np.sum(gray > 220) / total_pixels          # reflective highlight ratio
+        laplacian      = cv2.Laplacian(gray, cv2.CV_64F)
+        texture_score  = float(np.var(laplacian))                    # surface roughness
+        edges          = cv2.Canny(gray, 100, 200)
+        edge_density   = np.sum(edges > 0) / total_pixels            # wrinkle/fold density
 
-        laplacian = cv2.Laplacian(gray, cv2.CV_64F)
-        texture_score = np.var(laplacian)
+        hsv             = cv2.cvtColor(result_img, cv2.COLOR_RGB2HSV)
+        avg_saturation  = float(np.mean(hsv[:, :, 1] / 255.0))
 
-        if highest_label == "paper" and bright_pixels > 0.05:
-            highest_label = "plastic"
+        # --- Score-based nudge (replaces brittle elif chain) ---
+        # Positive = evidence for PLASTIC, negative = evidence for PAPER
 
-        elif highest_label == "plastic" and texture_score > 120:
-            highest_label = "paper"
-    # -----------------------------------------
+        plastic_signal = 0.0
 
-    # Sort predictions
+        # Reflection → plastic
+        if bright_pixels > 0.06:
+            plastic_signal += min(0.12, bright_pixels * 1.8)
+
+        # Low texture → plastic (smooth surface)
+        if texture_score < 100:
+            plastic_signal += min(0.08, (100 - texture_score) / 800)
+
+        # High texture or many edges → paper
+        if texture_score > 110:
+            plastic_signal -= min(0.10, (texture_score - 110) / 600)
+        if edge_density > 0.08:
+            plastic_signal -= min(0.08, (edge_density - 0.08) * 3.0)
+
+        # Saturation → colored plastic bag/wrapper
+        if avg_saturation > 0.35 and plastic_score > 0.2:
+            plastic_signal += min(0.08, (avg_saturation - 0.35) * 0.6)
+
+        # Transparent bag: very flat, very few edges, slight brightness
+        if texture_score < 40 and edge_density < 0.02 and bright_pixels > 0.04:
+            plastic_signal += 0.07
+
+        # Apply nudge only if signal is meaningful
+        NUDGE_THRESHOLD = 0.03
+        baseline = max(paper_score, plastic_score)
+
+        if plastic_signal > NUDGE_THRESHOLD:
+            classification["plastic"] = baseline + plastic_signal
+        elif plastic_signal < -NUDGE_THRESHOLD:
+            classification["paper"] = baseline + abs(plastic_signal)
+    # ==========================================
+
+    # -------- MIXED WASTE OVERRIDE --------
+    # If scores are broadly spread across 3+ categories,
+    # consider the item mixed waste.
+    scores_above_0_3 = sum(v > 0.3 for v in classification.values())
+    mixed_score      = classification.get("mixed waste", 0.0)
+
+    if scores_above_0_3 >= 3 and mixed_score > 0.1:
+        # Boost mixed waste so it surfaces correctly in uncertain cases
+        current_max = max(classification.values())
+        classification["mixed waste"] = max(mixed_score, current_max * 0.9)
+    # --------------------------------------
+
+    # Sort all predictions
     sorted_predictions = sorted(
         classification.items(),
         key=lambda x: x[1],
@@ -137,33 +182,45 @@ async def predict_image(file: UploadFile = File(...)):
     top1_label, top1_conf = sorted_predictions[0]
     top2_label, top2_conf = sorted_predictions[1]
 
-    # ---------- UNCERTAIN CASE ----------
-    if top1_conf < 0.7 or (top1_conf - top2_conf) < 0.15:
+    # -------- UNCERTAIN CASE --------
+    CONFIDENCE_THRESHOLD = 0.70
+    MARGIN_THRESHOLD     = 0.15
+
+    if top1_conf < CONFIDENCE_THRESHOLD or (top1_conf - top2_conf) < MARGIN_THRESHOLD:
         return {
-            "message": f"Model uncertain. It may be either {top1_label} or {top2_label}.",
+            "status": "uncertain",
+            "message": f"Model uncertain — likely {top1_label} or {top2_label}.",
             "top_prediction": {
-                "label": top1_label,
-                "confidence": top1_conf
+                "label":      top1_label,
+                "confidence": round(top1_conf, 4)
             },
             "second_prediction": {
-                "label": top2_label,
-                "confidence": top2_conf
+                "label":      top2_label,
+                "confidence": round(top2_conf, 4)
+            },
+            "all_scores": {
+                k: round(v, 4) for k, v in sorted_predictions
             }
         }
+    # --------------------------------
 
-    # ---------- NORMAL CASE ----------
-    above_threshold = {
-        label: value
+    # -------- CONFIDENT CASE --------
+    others_above_threshold = {
+        label: round(value, 4)
         for label, value in classification.items()
-        if value > 0.7 and label != top1_label
+        if value > CONFIDENCE_THRESHOLD and label != top1_label
     }
 
     return {
+        "status": "ok",
         "top_prediction": {
-            "label": top1_label,
-            "confidence": top1_conf
+            "label":      top1_label,
+            "confidence": round(top1_conf, 4)
         },
-        "others_above_0.7": above_threshold
+        "others_above_0.7": others_above_threshold,
+        "all_scores": {
+            k: round(v, 4) for k, v in sorted_predictions
+        }
     }
     
 # ---------------------------
