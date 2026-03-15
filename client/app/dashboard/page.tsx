@@ -7,7 +7,6 @@ import { Loader2, Camera, RefreshCw, CheckCircle2, AlertTriangle, ChevronRight, 
 import { DEFAULT_META, FEEDBACK_LABELS, LABEL_META, type PredictResponse, type PredictionLabel } from "@/types/prediction";
 
 
-
 // ─── ConfidenceBar ────────────────────────────────────────────────────────────
 function ConfidenceBar({
   label,
@@ -107,10 +106,12 @@ export default function Dashboard() {
     if (!file) return;
     setLoading(true);
     try {
-      const res = await predictImage(file);
+      // isMobile flag → compressImage runs inside predictImage for mobile only
+      const res = await predictImage(file, isMobile);
       setPrediction(res);
-    } catch {
-      showToast("Prediction failed. Please try again.", "error");
+    } catch (error: any) {
+      const msg = error?.response?.data?.detail || error?.message || "Unknown error"
+      showToast(`Error: ${msg}`, "error");
     }
     setLoading(false);
   };
@@ -130,7 +131,7 @@ export default function Dashboard() {
     if (!file || !prediction || !correctLabel) return;
     setFeedbackLoading(true);
     try {
-      await sendFeedback(file, prediction.top_prediction.label, correctLabel);
+      await sendFeedback(file, prediction.top_prediction.label, correctLabel, isMobile);
       finalize();
     } catch {
       showToast("Feedback failed. Try again.", "error");
@@ -142,7 +143,7 @@ export default function Dashboard() {
     if (!file || !prediction) return;
     setFeedbackLoading(true);
     try {
-      await sendFeedback(file, prediction.top_prediction.label, label);
+      await sendFeedback(file, prediction.top_prediction.label, label, isMobile);
       finalize();
     } catch {
       showToast("Feedback failed. Try again.", "error");
@@ -321,7 +322,6 @@ export default function Dashboard() {
                     })}
                   </div>
 
-                  {/* Escape hatch — neither suggestion is correct */}
                   <button
                     onClick={() => setShowFeedback(true)}
                     className="mt-3 w-full flex items-center justify-center gap-2 border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-500 text-xs font-medium py-2.5 rounded-xl transition-all active:scale-[0.98]"
@@ -335,17 +335,11 @@ export default function Dashboard() {
             {/* ── CONFIDENT ── */}
             {isConfident && (
               <div className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${topMeta.border}`}>
-
-                {/* Result banner — stacks on mobile */}
                 <div className={`${topMeta.bg} px-4 sm:px-5 py-4 sm:py-5`}>
                   <div className="flex items-start gap-3 sm:gap-4">
-
-                    {/* Icon */}
                     <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl border ${topMeta.border} flex items-center justify-center text-2xl sm:text-3xl bg-white shadow-sm shrink-0`}>
                       {topMeta.icon}
                     </div>
-
-                    {/* Label + bin — fills remaining space */}
                     <div className="flex-1 min-w-0">
                       <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400">
                         Detected waste type
@@ -358,10 +352,8 @@ export default function Dashboard() {
                         <span className="truncate">{topMeta.bin}</span>
                       </p>
                     </div>
-
                   </div>
 
-                  {/* Confidence — always its own row below on all screen sizes for clarity */}
                   <div className={`mt-3 pt-3 border-t ${topMeta.border} flex items-baseline gap-2`}>
                     <p className={`text-4xl font-extrabold leading-none ${topMeta.color}`} style={{ fontFamily: "var(--font-dm-mono)" }}>
                       {Math.round(prediction.top_prediction.confidence * 100)}%
@@ -370,7 +362,6 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* Score breakdown */}
                 {allScores.length > 0 && (
                   <div className="px-4 sm:px-5 py-4 border-t border-gray-100">
                     <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-3">All scores</p>
@@ -447,7 +438,7 @@ export default function Dashboard() {
               <div className="flex flex-col items-center gap-3 bg-white rounded-2xl border border-emerald-200 p-5 sm:p-6 shadow-sm text-center">
                 <CheckCircle2 className="w-8 h-8 text-emerald-500" />
                 <p className="text-sm font-semibold text-gray-700">Response recorded</p>
-                <p className="text-xs text-gray-400">Thank you for helping improve MedScan AI.</p>
+                <p className="text-xs text-gray-400">Thank you for helping improve SAAF AI.</p>
                 <button
                   onClick={() => { setImage(null); setFile(null); resetStates(); }}
                   className="mt-1 flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
