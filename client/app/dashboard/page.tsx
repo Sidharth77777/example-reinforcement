@@ -500,7 +500,7 @@ export default function Dashboard() {
             {inputMode === "upload" && !image && (
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex-1 flex items-center justify-center gap-2 border border-white/20 hover:border-white/40 bg-gradient-to-b from-[#202020] to-[#111] text-white text-xs font-semibold py-3 rounded-xl transition-all [font-family:var(--font-hooge)] tracking-widest active:scale-95"
+                className="flex-1 flex items-center justify-center gap-2 border border-white/20 hover:border-white/40 bg-gradient-to-b from-[#202020] to-[#111] text-white text-xs font-semibold py-3 px-3 rounded-xl transition-all [font-family:var(--font-hooge)] tracking-widest active:scale-95"
               >
                 <Upload className="w-4 h-4" />
                 BROWSE IMAGE
@@ -509,7 +509,7 @@ export default function Dashboard() {
 
             {/* Mobile gallery upload in upload mode */}
             {inputMode === "upload" && isMobile && !image && (
-              <label className="flex-1 flex items-center justify-center gap-2 border border-white/10 hover:border-white/20 bg-transparent text-white/40 text-xs font-semibold py-3 rounded-xl cursor-pointer transition-all [font-family:var(--font-hooge)] tracking-widest active:scale-95">
+              <label className="flex-1 flex items-center text-center justify-center gap-2 border border-white/10 hover:border-white/20 bg-transparent text-white/40 text-xs font-semibold py-3 px-3 rounded-xl cursor-pointer transition-all [font-family:var(--font-hooge)] tracking-widest active:scale-95">
                 <Camera className="w-4 h-4" />
                 FROM CAMERA
                 <input

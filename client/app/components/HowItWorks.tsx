@@ -28,7 +28,7 @@ export default function HowItWorks() {
   ];
 
   return (
-    <section className="w-full bg-black py-20 px-4 sm:px-6 lg:px-10">
+    <section className="w-full bg-black py-10 px-4 sm:px-6 lg:px-10">
 
       {/* TITLE */}
       <div className="flex items-center justify-center gap-4 mb-16">
