@@ -1,19 +1,26 @@
 import type { Metadata } from "next";
-import { Outfit, DM_Mono } from "next/font/google";
+import { Imprima, Orbitron } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import LayoutProvider from "./LayoutProvider";
 
-const outfit = Outfit({
-  variable: "--font-outfit",
+const imprima = Imprima({
+  variable: "--font-imprima",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  weight: "400", // ONLY available weight
   display: "swap",
 });
 
-const dmMono = DM_Mono({
-  variable: "--font-dm-mono",
+const orbitron = Orbitron({
+  variable: "--font-orbitron",
   subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: "400", // ONLY available weight
+  display: "swap",
+});
+
+const hooge = localFont({
+  src: "./fonts/hooge 05_54.ttf",
+  variable: "--font-hooge",
   display: "swap",
 });
 
@@ -30,8 +37,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${outfit.variable} ${dmMono.variable} antialiased`}
-        style={{ fontFamily: "var(--font-outfit), sans-serif" }}
+        className={`${imprima.variable} ${orbitron.variable} ${hooge.variable}  antialiased bg-black`}
+        // style={{ fontFamily: "var(--font-outfit), sans-serif" }}
       >
         <LayoutProvider>
           {children}

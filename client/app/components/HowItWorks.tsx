@@ -1,90 +1,100 @@
-import { Camera, Brain, Cog, Trash2, ArrowRight, ArrowDown } from "lucide-react"
+"use client";
+
+import { ArrowRight, ArrowDown } from "lucide-react";
+import Image from "next/image";
 
 export default function HowItWorks() {
   const steps = [
     {
-      icon: Camera,
-      title: "Camera Scans Waste",
+      title: "CAMERA SCANS WASTE",
       description: "Camera detects waste types",
+      image: "/images/DIgital camera.png",
     },
     {
-      icon: Brain,
-      title: "AI Identifies Material",
+      title: "AI IDENTIFIES MATERIAL",
       description: "AI analyzes waste material",
+      image: "/images/AI.png",
     },
     {
-      icon: Cog,
-      title: "Smart Sorting Mechanism",
+      title: "SMART SORTING MECHANISM",
       description: "Automated sorting process",
+      image: "/images/sorting.png",
     },
     {
-      icon: Trash2,
-      title: "Sorted Into Bins",
+      title: "SORTED INTO BINS",
       description: "Waste placed in correct bins",
+      image: "/images/bins.png",
     },
-  ]
+  ];
 
   return (
-    <section className="w-full bg-gray-50 py-20 px-4">
+    <section className="w-full bg-black py-20 px-4 sm:px-6 lg:px-10">
 
-      {/* TITLE WITH LINES */}
+      {/* TITLE */}
       <div className="flex items-center justify-center gap-4 mb-16">
-        <div className="flex-1 h-[1px] bg-gray-300 max-w-[300]" />
-        <h2 className="text-2xl md:text-3xl font-semibold text-center">
-          How It Works
+        <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent to-[#6c6c6c]" />
+        <h2 className="text-xl sm:text-2xl lg:text-3xl text-white [font-family:var(--font-hooge)] tracking-widest">
+          HOW IT WORKS
         </h2>
-        <div className="flex-1 h-[1px] bg-gray-300 max-w-[300]" />
+        <div className="h-[1px] flex-1 bg-gradient-to-r from-[#6c6c6c] to-transparent" />
       </div>
 
       {/* STEPS */}
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-10">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-10 relative">
 
-        {steps.map((step, index) => {
-          const Icon = step.icon
+        {steps.map((step, index) => (
+          <div key={index} className="relative flex flex-col items-center text-center group">
 
-          return (
-            <div
-              key={index}
-              className="flex flex-col md:flex-row items-center gap-6"
-            >
+            {/* CARD */}
+            <div className="relative group hover:-translate-y-2 transition duration-300 w-full max-w-[220px] rounded-xl p-6 hover:border-white/30 transition">
 
-              {/* STEP CARD */}
-              <div className="flex flex-col items-center text-center max-w-[200px]">
-
-                <div className="w-16 h-16 bg-white shadow-md rounded-xl flex items-center justify-center mb-4">
-                  <Icon size={30} />
+              {/* IMAGE */}
+              <div className="mb-4 flex justify-center">
+                <div className="w-40 sm:w-40 lg:w-60">
+                  <Image
+                    src={step.image}
+                    alt={step.title}
+                    width={140}
+                    height={140}
+                    className="w-full object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.2)] group-hover:scale-110 transition duration-300"
+                  />
                 </div>
-
-                <h3 className="font-semibold text-lg">
-                  {step.title}
-                </h3>
-
-                <p className="text-sm text-gray-600 mt-1">
-                  {step.description}
-                </p>
-
               </div>
 
-              {/* DESKTOP ARROW */}
-              {index !== steps.length - 1 && (
-                <ArrowRight
-                  className="hidden md:block text-gray-400"
-                  size={28}
-                />
-              )}
+              {/* TEXT */}
+              <h3 className="text-white text-sm sm:text-base [font-family:var(--font-hooge)]">
+                {step.title}
+              </h3>
 
-              {/* MOBILE ARROW */}
-              {index !== steps.length - 1 && (
-                <ArrowDown
-                  className="md:hidden text-gray-400"
-                  size={28}
-                />
-              )}
+              {/* <p className="text-white/60 text-xs sm:text-sm mt-2 [font-family:var(--font-imprima)]">
+                {step.description}
+              </p> */}
+
             </div>
-          )
-        })}
+
+            {index !== steps.length - 1 && (
+              <div
+                className="hidden md:flex items-center absolute top-1/2 -right-12 animate-[fadeLoop_2.5s_ease-in-out_infinite]"
+                style={{ animationDelay: `${index * 0.6}s` }}
+              >
+                <div className="w-20 lg:w-24 h-[2px] bg-gradient-to-r from-[#000] to-[#6c6c6c]" />
+                <div className="w-3 h-3 border-t-2 border-r-2 border-[#6C6C6C] rotate-45 -ml-2" />
+              </div>
+            )}
+
+            {index !== steps.length - 1 && (
+              <div
+                className="md:hidden flex flex-col items-center mt-6 animate-[fadeLoop_2.5s_ease-in-out_infinite]"
+                style={{ animationDelay: `${index * 0.6}s` }}
+              >
+                <div className="h-10 w-[2px] bg-gradient-to-b from-[#000] to-[#6c6c6c]" />
+                <div className="w-3 h-3 border-b-2 border-r-2 border-[#6C6C6C] rotate-45 -mt-2" />
+              </div>
+            )}
+          </div>
+        ))}
 
       </div>
     </section>
-  )
+  );
 }

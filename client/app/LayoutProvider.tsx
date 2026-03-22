@@ -3,7 +3,7 @@ import Header from "./components/Header";
 
 export default function LayoutProvider({ children }: { children: React.ReactNode }) {
     return (
-        <div>
+        <div className="bg-[#000]">
             <Header />
 
             {children}

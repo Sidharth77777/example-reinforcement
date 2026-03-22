@@ -127,3 +127,27 @@
     @apply font-sans;
   }
 }
+
+@keyframes fadeLoop {
+  0% {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  20% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  40% {
+    opacity: 1;
+  }
+  60% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.fade-loop {
+  animation: fadeLoop 2.5s ease-in-out infinite;
+}
