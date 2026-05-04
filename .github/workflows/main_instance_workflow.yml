@@ -1,0 +1,44 @@
+name: Deploy to New EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-new:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to New EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_NEW_HOST }}
+          username: ${{ secrets.EC2_NEW_USER }}
+          key: ${{ secrets.EC2_NEW_SSH_KEY }}
+          script: |
+            cd ~/example-reinforcement || exit
+
+            echo "Pulling latest code..."
+            git pull origin main || exit
+
+            echo "Activating venv..."
+            source server/venv/bin/activate
+
+            echo "Checking if requirements changed..."
+            if git rev-parse HEAD~1 >/dev/null 2>&1; then
+              if git diff HEAD~1 HEAD --name-only | grep -q "requirements.txt"; then
+                echo "Installing updated dependencies..."
+                pip install -r server/requirements.txt --quiet
+              else
+                echo "No dependency changes detected."
+              fi
+            else
+              echo "First deployment, installing dependencies..."
+              pip install -r server/requirements.txt --quiet
+            fi
+
+            echo "Restarting backend..."
+            sudo systemctl restart reinforcement
+
+            echo "Deployment completed successfully!"
